@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.bulwarkspecrange'
+version = '1.0.0'
+
+repositories {
+    maven {
+        url = 'https://repo.runelite.net'
+        content {
+            includeGroupByRegex('net[.]runelite.*')
+        }
+    }
+    mavenCentral()
+}
+
+def runeLiteVersion = '1.13.7'
+
+dependencies {
+    compileOnly "net.runelite:client:${runeLiteVersion}"
+    testImplementation "net.runelite:client:${runeLiteVersion}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release.set(11)
+}
+
+tasks.register('run', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.bulwarkspecrange.BulwarkSpecRangeLauncher'
+    jvmArgs '-ea'
+    args '--developer-mode', '--disable-telemetry'
+
+    def profile = layout.buildDirectory.dir('test-profile').get().asFile
+    systemProperty 'user.home', profile.absolutePath
+    doFirst {
+        profile.mkdirs()
+    }
+}
+
+[
+    verifyOverlay: 'BulwarkSpecRangeTest',
+    verifyConfig: 'BulwarkConfigTest'
+].each { name, className ->
+    def verification = tasks.register(name, JavaExec) {
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = "com.bulwarkspecrange.${className}"
+        systemProperty 'java.awt.headless', 'true'
+        doFirst {
+            systemProperty 'user.home', java.nio.file.Files.createTempDirectory(temporaryDir.toPath(), 'profile-').toString()
+        }
+    }
+    tasks.named('check') {
+        dependsOn verification
+    }
+}
